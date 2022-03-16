@@ -1,68 +1,76 @@
-const usuariosDao = require('./usuarios-dao');
-const { InvalidArgumentError } = require('../erros');
-const validacoes = require('../validacoes-comuns');
-const bcrypt = require('bcrypt');
+const usuariosDao = require('./usuarios-dao')
+const { InvalidArgumentError } = require('../erros')
+const validacoes = require('../validacoes-comuns')
+const bcrypt = require('bcrypt')
 
 class Usuario {
-  constructor(usuario) {
-    this.id = usuario.id;
-    this.nome = usuario.nome;
-    this.email = usuario.email;
-    this.senhaHash = usuario.senhaHash;
-    this.valida();
-  }
-
-  async adiciona() {
-    if (await Usuario.buscaPorEmail(this.email)) {
-      throw new InvalidArgumentError('O usuário já existe!');
+    constructor(usuario) {
+        this.id = usuario.id
+        this.nome = usuario.nome
+        this.email = usuario.email
+        this.senhaHash = usuario.senhaHash
+        this.emailVerificado = usuario.emailVerificado
+        this.valida()
     }
 
-    await usuariosDao.adiciona(this);
-  }
+    async adiciona() {
+        if (await Usuario.buscaPorEmail(this.email)) {
+            throw new InvalidArgumentError('O usuário já existe!')
+        }
 
-  async adicionaSenha(senha) {
-    validacoes.campoStringNaoNulo(senha, 'senha');
-    validacoes.campoTamanhoMinimo(senha, 'senha', 8);
-    validacoes.campoTamanhoMaximo(senha, 'senha', 64);
-
-    this.senhaHash = await Usuario.gerarSenhaHash(senha);
-  }
-
-  valida() {
-    validacoes.campoStringNaoNulo(this.nome, 'nome');
-    validacoes.campoStringNaoNulo(this.email, 'email');
-  }
-
-  async deleta() {
-    return usuariosDao.deleta(this);
-  }
-
-  static async buscaPorId(id) {
-    const usuario = await usuariosDao.buscaPorId(id);
-    if (!usuario) {
-      return null;
+        await usuariosDao.adiciona(this)
+        const { id } = await usuariosDao.buscaPorEmail(this.email)
+        this.id = id
     }
 
-    return new Usuario(usuario);
-  }
+    async adicionaSenha(senha) {
+        validacoes.campoStringNaoNulo(senha, 'senha')
+        validacoes.campoTamanhoMinimo(senha, 'senha', 8)
+        validacoes.campoTamanhoMaximo(senha, 'senha', 64)
 
-  static async buscaPorEmail(email) {
-    const usuario = await usuariosDao.buscaPorEmail(email);
-    if (!usuario) {
-      return null;
+        this.senhaHash = await Usuario.gerarSenhaHash(senha)
     }
 
-    return new Usuario(usuario);
-  }
+    valida() {
+        validacoes.campoStringNaoNulo(this.nome, 'nome')
+        validacoes.campoStringNaoNulo(this.email, 'email')
+    }
 
-  static lista() {
-    return usuariosDao.lista();
-  }
+    async verificaEmail() {
+        this.emailVerificado = true
+        await usuariosDao.modificaEmailVerificado(this, this.emailVerificado)
+    }
 
-  static gerarSenhaHash(senha) {
-    const custoHash = 12;
-    return bcrypt.hash(senha, custoHash);
-  }
+    async deleta() {
+        return usuariosDao.deleta(this)
+    }
+
+    static async buscaPorId(id) {
+        const usuario = await usuariosDao.buscaPorId(id)
+        if (!usuario) {
+            return null
+        }
+
+        return new Usuario(usuario)
+    }
+
+    static async buscaPorEmail(email) {
+        const usuario = await usuariosDao.buscaPorEmail(email)
+        if (!usuario) {
+            return null
+        }
+
+        return new Usuario(usuario)
+    }
+
+    static lista() {
+        return usuariosDao.lista()
+    }
+
+    static gerarSenhaHash(senha) {
+        const custoHash = 12
+        return bcrypt.hash(senha, custoHash)
+    }
 }
 
-module.exports = Usuario;
+module.exports = Usuario

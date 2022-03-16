@@ -1,20 +1,12 @@
 const passport = require('passport')
 const Usuario = require('./usuarios-modelo')
-const { InvalidArgumentError } = require('../erros')
 const allowlistRefreshToken = require('../../redis/alllowlist-refresh-token')
 
-async function verificaRefreshToken(refreshToken) {
-    if (!refreshToken) {
-        throw new InvalidArgumentError('Refresh token não enviado.')
-    }
-    const id = await allowlistRefreshToken.buscaValor(refreshToken)
-    if (!id) {
-        throw new InvalidArgumentError('Refresh token inválido.')
-    }
-    return id
-}
+const tokens = require('./tokens')
 
-async function invalidaRefreshToken
+async function invalidaRefreshToken(refreshToken) {
+    await allowlistRefreshToken.deleta(refreshToken)
+}
 
 module.exports = {
     local(req, res, next) {
@@ -66,16 +58,44 @@ module.exports = {
 
                 req.token = info.token
                 req.user = usuario
+                console.log('e aq?')
                 return next()
             }
         )(req, res, next)
     },
 
     async refresh(req, res, next) {
-        const { refreshToken } = req.body
-        const id = await verificaRefreshToken(refreshToken)
-        await invalidaRefreshToken(refreshToken)
-        req.user = Usuario.buscaPorId(id)
-        return next()
+        try {
+            const { refreshToken } = req.body
+            const id = await tokens.refresh.verifica(refreshToken)
+            await invalidaRefreshToken(refreshToken)
+            req.user = await Usuario.buscaPorId(id)
+            return next()
+        } catch (error) {
+            if (error.name === 'InvalidArgumentError') {
+                return res.status(401).json({ error: error.message })
+            }
+            return res.status(500).json({ error: error.message })
+        }
+    },
+    async verificacaoEmail(req, res, next) {
+        try {
+            const { token } = req.params
+            const id = await tokens.verificacaoEmail.verifica(token)
+            const usuario = await Usuario.buscaPorId(id)
+            req.user = usuario
+            next()
+        } catch (error) {
+            if (erro.name === 'JsonWebTokenError') {
+                return res.status(401).json({ error: error.message })
+            }
+            if (erro.mame === 'TokenExpiredError') {
+                return res.status(401).json({
+                    error: error.message,
+                    expiradoEm: error.expiredAt,
+                })
+            }
+            res.status(500).json({ error: error.message })
+        }
     },
 }
